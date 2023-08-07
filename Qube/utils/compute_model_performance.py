@@ -69,21 +69,36 @@ def evaluation(output,df):
         return  [100 *spearmanr(output[:,i], df["TARGET"]).correlation for i in range(len(term)) ]
     
 
+def mean_error(list1, list2):
+    if len(list1) != len(list2):
+        raise ValueError("Both lists must have the same length")
 
+    squared_errors = [(x - y) for x, y in zip(list1, list2)]
+    mse = sum(squared_errors) / len(list1)
+    return mse
+
+def verify(x,y):
+    if (x>0.5 and y==1) or (x<0.5 and y==0) or (x==0.5 and y==0.5) :
+        return 1
+    else:
+        return 0 
+
+def accuracy(list1,list2):
+    return sum([verify(x,y) for x, y in zip(list1, list2)])/ len(list1)
 
 class Model:
-    def __init__(self,regressor_FR,regressor_DE,depth=None):
+    def __init__(self,regressor_FR,regressor_DE,depth=None,n_estimators=None):
         self.regressor_class_FR= regressor_FR
         self.regressor_class_DE= regressor_DE
         self.depth=depth
-
+        self.estimators=n_estimators
     def refresh_regressors(self):
-        if self.depth is None:
+        if self.depth  is None:
             self.regressor_FR= self.regressor_class_FR()
             self.regressor_DE= self.regressor_class_DE()
         else :
-            self.regressor_FR= self.regressor_class_FR(self.depth)
-            self.regressor_DE= self.regressor_class_DE(self.depth)
+            self.regressor_FR= self.regressor_class_FR(max_depth=self.depth,n_estimators=self.estimators)
+            self.regressor_DE= self.regressor_class_DE(max_depth=self.depth,n_estimators=self.estimators)
     
     def get_data_and_order(self,X,Y):
         self.X=X
@@ -148,7 +163,7 @@ class Model:
         Y_train=Y_train.sort_values(by=['ID'], key=lambda x: x.map({k: i for i, k in enumerate(Train_Ids)}))
         return Y_test,Y_train,X_train_DE,Y_train_DE,X_train_FR,Y_train_FR,X_test_DE,Y_test_DE,X_test_FR,Y_test_FR
     
-    def Compute(self,iterations=20,columns=['TARGET','Rank'],custom_group=2,group=False,rank_before=True,split_countries=True):
+    def Compute(self,iterations=20,columns=['TARGET','Rank'],custom_group=2,group=False,rank_before=True,split_countries=True,split=True,verbose=True):
         valid_list=[]
         valid_list_FR=[]
         valid_list_DE=[]
@@ -157,37 +172,74 @@ class Model:
             if group :
                 columns=handle_group_columns(columns,'Rank_group')
                 
-             
-            if not split_countries:
-                Y_test,Y_train,X_train_DE,Y_train_DE,X_train_FR,Y_train_FR,X_test_DE,Y_test_DE,X_test_FR,Y_test_FR=self.split_into_tests_before_countries(rank_before,custom_group,test_size=0.25)
-            else:
-                Y_test,Y_train,X_train_DE,Y_train_DE,X_train_FR,Y_train_FR,X_test_DE,Y_test_DE,X_test_FR,Y_test_FR=self.split_into_countries_before_tests(rank_before,custom_group,test_size=0.25)
+            if split :
+                if not split_countries:
+                    Y_test,Y_train,X_train_DE,Y_train_DE,X_train_FR,Y_train_FR,X_test_DE,Y_test_DE,X_test_FR,Y_test_FR=self.split_into_tests_before_countries(rank_before,custom_group,test_size=0.25)
+                else:
+                    Y_test,Y_train,X_train_DE,Y_train_DE,X_train_FR,Y_train_FR,X_test_DE,Y_test_DE,X_test_FR,Y_test_FR=self.split_into_countries_before_tests(rank_before,custom_group,test_size=0.25)
+
+
+                self.refresh_regressors()
+            
+                self.fit(X_train_FR,Y_train_FR,X_train_DE,Y_train_DE,columns)
                 
-            # print(X_train_FR.info())
-            # print(Y_train_FR.info())
-            # print(X_test_FR.info())
-            # print(X_test_FR.info())
-            self.refresh_regressors()
-            
-            self.fit(X_train_FR,Y_train_FR,X_train_DE,Y_train_DE,columns)
-            
 
-            pred_FR = self.predict_FR(X_test_FR)
-            # print(pred_FR)
-            pred_DE = self.predict_DE(X_test_DE)
+                pred_FR = self.predict_FR(X_test_FR)
             
-            Y_pred=self.reunite(pred_FR,pred_DE,X_test_FR,X_test_DE,columns,Y_test)
-            # print("Y_test \n",Y_test)
-            # print("Y_pred \n",Y_pred)
+                pred_DE = self.predict_DE(X_test_DE)
+                
+                Y_pred=self.reunite(pred_FR,pred_DE,X_test_FR,X_test_DE,columns,Y_test)
+                
 
-            validation=self.evaluate(Y_pred,Y_test,columns)
-            valid_list_FR+=[evaluation(pred_FR,Y_test_FR)]
-            valid_list_DE+=[evaluation(pred_DE,Y_test_DE)]
-            # print("eval done")
-            training=self.evaluate(self.reunite(self.predict_FR(X_train_FR),self.predict_DE(X_train_DE),X_train_FR,X_train_DE,columns,Y_train),Y_train,columns)
+                validation=self.evaluate(Y_pred,Y_test,columns)
+                valid_list_FR+=[evaluation(pred_FR,Y_test_FR)]
+                valid_list_DE+=[evaluation(pred_DE,Y_test_DE)]
+                
+                
+                training=self.evaluate(self.reunite(self.predict_FR(X_train_FR),self.predict_DE(X_train_DE),X_train_FR,X_train_DE,columns,Y_train),Y_train,columns)
+                train_list+=[training]
+            else :  
+
+                X_train, X_test, Y_train, Y_test=train_test_split(self.X,self.Y, test_size=0.25)
+                print("X_train and Y_train same ID ?",X_train['ID'].tolist()==Y_train['ID'].tolist())
+                print("X_test and Y_test same ID ?",X_test['ID'].tolist()==Y_test['ID'].tolist())
+                Y_train_pairwise=create_pairwise_dataset(Y_train)
+                X_train_pairwise=get_training_pairwise(X_train)
+                Y_test_pairwise=create_pairwise_dataset(Y_test)
+                X_test_pairwise=get_training_pairwise(X_test)
+                if verbose:
+                    print("pairwise creation done")
+                self.refresh_regressors()
+
+                self.regressor_FR.fit(X_train_pairwise.drop(['ID1','ID2'],axis=1),Y_train_pairwise['Comparison'].astype(np.int8))
+
+                Y_pred_pairwise_list=self.regressor_FR.predict(X_test_pairwise.drop(['ID1','ID2'],axis=1))
+
+                Y_train_pred_pairwise_list=self.regressor_FR.predict(X_train_pairwise.drop(['ID1','ID2'],axis=1))
+
+                print("error_val",mean_error(Y_pred_pairwise_list, Y_test_pairwise['Comparison']))
+
+                print('accuracy_val',accuracy(Y_pred_pairwise_list, Y_test_pairwise['Comparison']) )
+
+                print("error_train",mean_error(Y_train_pred_pairwise_list, Y_train_pairwise['Comparison']))
+
+                print('accuracy_train',accuracy(Y_train_pred_pairwise_list, Y_train_pairwise['Comparison']) )
+                Y_pred_pairwise= pd.DataFrame({'ID1': X_test_pairwise["ID1"],'ID2': X_test_pairwise["ID2"],'Comparison': Y_pred_pairwise_list})
+                if verbose:
+                    print("reconstructing rank ...")
+                Y_pred=reconstruct_original_dataset(Y_pred_pairwise)
+                Y_pred=Y_pred.sort_values(by=['ID'], key=lambda x: x.map({k: i for i, k in enumerate(Y_test['ID'].tolist())}))
+                print("Y_pred and Y_test same ID ?",Y_pred['ID'].tolist()==Y_test['ID'].tolist())
+                print("Same length ?",len(Y_pred['ID'].tolist())==len(Y_test['ID'].tolist()))
+                print(pd.concat((Y_pred.reset_index(drop=True),Y_test.reset_index(drop=True)),axis=1))
+                validation=self.evaluate(Y_pred,Y_test,['Rank_recreated'])[0]
+                print("validation", validation)
+                valid_list_DE=[np.nan]
+                valid_list_FR=[np.nan]
+                train_list=[np.nan]
             # print("training done")
             valid_list+=[validation]
-            train_list+=[training]
+            
 
         
         if isinstance(columns,list):
@@ -195,8 +247,8 @@ class Model:
                 print( f"average {column} evaluation score at:", np.round(sum([row[i] for row in valid_list])/len(valid_list),1) , "   training at:", np.round(sum([row[i] for row in train_list])/len(train_list),1) , "    FR model at:", np.round(sum([row[i] for row in valid_list_FR])/len(valid_list_FR),1), "    DE model at:", np.round(sum([row[i] for row in valid_list_DE])/len(valid_list_DE),1))
                 
         else:
-            print( f"average {columns} evaluation score at ", sum(valid_list)/len(valid_list) , "training at :" ,  sum(train_list)/len(train_list) )
-            print( f"average {column} evaluation score for FR_Dataset at ", sum([row[i] for row in valid_list_FR])/len(valid_list_FR), f"average {column} evaluation score for DE_Dataset at ", sum([row[i] for row in valid_list_DE])/len(valid_list_DE))
+            print( f"average {columns} evaluation score at ", sum(valid_list)/len(valid_list) , "training at :" ,  sum(train_list)/len(train_list),"training at :" ,  sum(valid_list_FR)/len(valid_list_FR),"training at :" ,  sum(valid_list_DE)/len(valid_list_DE) )
+        
         
         print("\n")
 

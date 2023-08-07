@@ -144,7 +144,7 @@ def reconstruct_original_dataset(pairwise_df):
     original_data = [(id, id_to_target[id]) for id in unique_ids]
 
     # Create the reconstructed original DataFrame
-    original_df = pd.DataFrame(original_data, columns=['ID', 'TARGET'])
+    original_df = pd.DataFrame(original_data, columns=['ID', 'Rank_recreated'])
 
     return original_df
 
@@ -154,7 +154,16 @@ def reconstruct_original_dataset(pairwise_df):
 
 
 def get_training_pairwise(df):
+
     
+    if "DE_NET_IMPORT" in df.columns:
+        df=df.drop(["DE_NET_IMPORT","FR_NET_IMPORT","DE_FR_EXCHANGE",'DAY_ID'],axis=1)
+    columns=df.columns
+    if 'COUNTRY' in columns :
+        country_mapping = {'FR': 0, 'DE': 1}
+        df['COUNTRY'] = df['COUNTRY'].map(country_mapping)
+        print("Country remapped")
+    df.fillna(df.mean(),inplace=True)
     pairs = list(itertools.combinations(df.values, 2))
     # print(len(pairs))
     # print(pairs[0])
@@ -168,8 +177,8 @@ def get_training_pairwise(df):
     # print(len(pairwise_data)==len(pairs))
     # print(pairwise_data[0])
     
-    pairwise_df = pd.DataFrame(pairwise_data, columns=np.hstack((df.columns+'1',df.columns+'2')))
-    new_order=[column  for column_pair in [(f"{column}1",f"{column}2") for column in df.columns ] for column in column_pair ]
+    pairwise_df = pd.DataFrame(pairwise_data, columns=np.hstack((columns+'1',columns+'2')))
+    new_order=[column  for column_pair in [(f"{column}1",f"{column}2") for column in columns ] for column in column_pair ]
     
     return pairwise_df[new_order]
     
