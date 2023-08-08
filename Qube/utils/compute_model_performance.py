@@ -72,19 +72,30 @@ def evaluation(output,df):
 def mean_error(list1, list2):
     if len(list1) != len(list2):
         raise ValueError("Both lists must have the same length")
-
+    print("list length is", len(list1))
     squared_errors = [(x - y) for x, y in zip(list1, list2)]
     mse = sum(squared_errors) / len(list1)
-    return mse
+    return mse , sorted(squared_errors,reverse=True)[:100]
 
 def verify(x,y):
-    if (x>0.5 and y==1) or (x<0.5 and y==0) or (x==0.5 and y==0.5) :
+    if (x> (1.5) and y==2) or (x< (0.5) and y==0) or (x<(1.5) and x>(0.5) and y==1) :
         return 1
     else:
-        return 0 
+        return 0
 
 def accuracy(list1,list2):
-    return sum([verify(x,y) for x, y in zip(list1, list2)])/ len(list1)
+    if 1 in list1:
+        metrics=[sum([verify(x,y) for x, y in zip(list1, list2)])/ len(list1),
+            sum([verify(x,y) for x, y in zip(list1, list2) if y==0])/ len([y for y in list2 if y==0]),
+            sum([verify(x,y) for x, y in zip(list1, list2) if y==1])/ len([y for y in list2 if y==2]),
+            sum([verify(x,y) for x, y in zip(list1, list2) if y==0.5])/len([y for y in list2 if y==1]) 
+    ]
+    else:
+        metrics=[sum([verify(x,y) for x, y in zip(list1, list2)])/ len(list1),
+            sum([verify(x,y) for x, y in zip(list1, list2) if y==0])/ len([y for y in list2 if y==0]),
+            sum([verify(x,y) for x, y in zip(list1, list2) if y==1])/ len([y for y in list2 if y==2])]
+        
+    return metrics
 
 class Model:
     def __init__(self,regressor_FR,regressor_DE,depth=None,n_estimators=None):
@@ -211,12 +222,13 @@ class Model:
                     print("pairwise creation done")
                 self.refresh_regressors()
 
-                self.regressor_FR.fit(X_train_pairwise.drop(['ID1','ID2'],axis=1),Y_train_pairwise['Comparison'].astype(np.int8))
+                self.regressor_FR.fit(X_train_pairwise.drop(['ID1','ID2'],axis=1),(Y_train_pairwise['Comparison']))
 
                 Y_pred_pairwise_list=self.regressor_FR.predict(X_test_pairwise.drop(['ID1','ID2'],axis=1))
 
                 Y_train_pred_pairwise_list=self.regressor_FR.predict(X_train_pairwise.drop(['ID1','ID2'],axis=1))
 
+                
                 print("error_val",mean_error(Y_pred_pairwise_list, Y_test_pairwise['Comparison']))
 
                 print('accuracy_val',accuracy(Y_pred_pairwise_list, Y_test_pairwise['Comparison']) )
@@ -225,13 +237,15 @@ class Model:
 
                 print('accuracy_train',accuracy(Y_train_pred_pairwise_list, Y_train_pairwise['Comparison']) )
                 Y_pred_pairwise= pd.DataFrame({'ID1': X_test_pairwise["ID1"],'ID2': X_test_pairwise["ID2"],'Comparison': Y_pred_pairwise_list})
+                print(pd.concat((Y_pred_pairwise.reset_index(drop=True),Y_test_pairwise.reset_index(drop=True)),axis=1).head(1000))
                 if verbose:
                     print("reconstructing rank ...")
                 Y_pred=reconstruct_original_dataset(Y_pred_pairwise)
                 Y_pred=Y_pred.sort_values(by=['ID'], key=lambda x: x.map({k: i for i, k in enumerate(Y_test['ID'].tolist())}))
+
                 print("Y_pred and Y_test same ID ?",Y_pred['ID'].tolist()==Y_test['ID'].tolist())
                 print("Same length ?",len(Y_pred['ID'].tolist())==len(Y_test['ID'].tolist()))
-                print(pd.concat((Y_pred.reset_index(drop=True),Y_test.reset_index(drop=True)),axis=1))
+                # print(pd.concat((Y_pred.reset_index(drop=True),Y_test.reset_index(drop=True)),axis=1))
                 validation=self.evaluate(Y_pred,Y_test,['Rank_recreated'])[0]
                 print("validation", validation)
                 valid_list_DE=[np.nan]

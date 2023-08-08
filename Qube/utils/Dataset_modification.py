@@ -80,7 +80,7 @@ def create_pairwise_dataset(df):
 
     # Compare each pair of IDs and add to the list
     for (id1,target1), (id2,target2) in pairs:
-        comparison = 1.0 if target1 > target2 else (0.5 if target1 == target2 else 0.0)
+        comparison = 2 if target1 > target2 else (1 if target1 == target2 else 0.0)
         pairwise_data.append((id1, id2, comparison))
 
     # Create a DataFrame from the pairwise data
@@ -109,7 +109,7 @@ def reconstruct_original_dataset(pairwise_df):
 
     # Iterate through rows in the pairwise DataFrame to determine targets for each ID
     for _, row in pairwise_df.iterrows():
-        if row['Comparison'] > 0.5:
+        if row['Comparison'] > 1.5 :
             # print('row',row)
             if row['ID1'] in id_to_target.keys() and row['ID1'] in dict_of_winning_comparaison.keys():
                 id_to_target[row['ID1']] +=1 
@@ -119,7 +119,7 @@ def reconstruct_original_dataset(pairwise_df):
                 dict_of_winning_comparaison[row['ID1']] =[row['ID2']] 
                 
             if not row['ID2'] in id_to_target.keys(): id_to_target[row['ID2']] =1
-        elif row['Comparison'] <0.5:
+        elif row['Comparison'] < 0.5:
             # print('row',row)
             if not row['ID1'] in id_to_target.keys(): id_to_target[row['ID1']] =1
             if row['ID2'] in id_to_target.keys() and row['ID2'] in dict_of_winning_comparaison.keys(): 
@@ -128,9 +128,9 @@ def reconstruct_original_dataset(pairwise_df):
             else:
                 id_to_target[row['ID2']] =2
                 dict_of_winning_comparaison[row['ID2']] =[row['ID1']] 
-        # else:  # Comparison == 0.5
-            # id_to_target[row['ID1']] = row['ID1']
-            # id_to_target[row['ID2']] = row['ID2']
+        else:  # Comparison == 0.5
+            id_to_target[row['ID1']] = row['ID1']
+            id_to_target[row['ID2']] = row['ID2']
             
     for id1 in dict_of_winning_comparaison.keys():
         for id2 in dict_of_winning_comparaison[id1]:
