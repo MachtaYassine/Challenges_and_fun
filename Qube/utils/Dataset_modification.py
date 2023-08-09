@@ -80,8 +80,12 @@ def create_pairwise_dataset(df):
 
     # Compare each pair of IDs and add to the list
     for (id1,target1), (id2,target2) in pairs:
-        comparison = 2 if target1 > target2 else (1 if target1 == target2 else 0.0)
-        pairwise_data.append((id1, id2, comparison))
+        if not np.isnan(target1) and not np.isnan(target2):
+            comparison = 2 if target1 > target2 else (1 if target1 == target2 else 0.0)
+            pairwise_data.append((id1, id2, comparison))
+        else:
+            comparison =np.random.choice([0, 1], size=1, p=[.5,.5])[0]
+            pairwise_data.append((id1, id2, comparison))
 
     # Create a DataFrame from the pairwise data
     pairwise_df = pd.DataFrame(pairwise_data, columns=['ID1', 'ID2', 'Comparison'])
@@ -109,7 +113,7 @@ def reconstruct_original_dataset(pairwise_df):
 
     # Iterate through rows in the pairwise DataFrame to determine targets for each ID
     for _, row in pairwise_df.iterrows():
-        if row['Comparison'] > 1.5 :
+        if row['Comparison'] > 1.1 :
             # print('row',row)
             if row['ID1'] in id_to_target.keys() and row['ID1'] in dict_of_winning_comparaison.keys():
                 id_to_target[row['ID1']] +=1 
@@ -119,7 +123,7 @@ def reconstruct_original_dataset(pairwise_df):
                 dict_of_winning_comparaison[row['ID1']] =[row['ID2']] 
                 
             if not row['ID2'] in id_to_target.keys(): id_to_target[row['ID2']] =1
-        elif row['Comparison'] < 0.5:
+        elif row['Comparison'] < 0.9:
             # print('row',row)
             if not row['ID1'] in id_to_target.keys(): id_to_target[row['ID1']] =1
             if row['ID2'] in id_to_target.keys() and row['ID2'] in dict_of_winning_comparaison.keys(): 
@@ -128,14 +132,14 @@ def reconstruct_original_dataset(pairwise_df):
             else:
                 id_to_target[row['ID2']] =2
                 dict_of_winning_comparaison[row['ID2']] =[row['ID1']] 
-        else:  # Comparison == 0.5
-            id_to_target[row['ID1']] = row['ID1']
-            id_to_target[row['ID2']] = row['ID2']
+        # else:  # Comparison == 0.5
+            # id_to_target[row['ID1']]
+            # id_to_target[row['ID2']] 
             
-    for id1 in dict_of_winning_comparaison.keys():
-        for id2 in dict_of_winning_comparaison[id1]:
-            if id_to_target[id2]>id_to_target[id1]:
-                id_to_target[id1]=id_to_target[id2]
+    # for id1 in dict_of_winning_comparaison.keys():
+    #     for id2 in dict_of_winning_comparaison[id1]:
+    #         if id_to_target[id2]>id_to_target[id1]:
+    #             id_to_target[id1]=id_to_target[id2]
 
     # print(id_to_target)
     # print(unique_ids)
@@ -183,38 +187,42 @@ def get_training_pairwise(df):
     return pairwise_df[new_order]
     
 
+
+def select_precentage_of_df(df,percentage):
+    return df.sample(n= int(len(df) * (percentage / 100)))
+
 if __name__=='__main__':
-    # data = {'ID': [1, 2, 3, 4, 5],
-    #     'TARGET': [1, 4, 3, 3, 5]}
-    # df = pd.DataFrame(data)
+    data = {'ID': [1, 2, 3, 4, 5],
+        'TARGET': [1, 4, 3, 3, 5]}
+    df = pd.DataFrame(data)
 
-    # # Create pairwise dataset
-    # pairwise_df = create_pairwise_dataset(df)
+    # Create pairwise dataset
+    pairwise_df = create_pairwise_dataset(df)
 
-    # # Print pairs of Target values
-    # print(pairwise_df)
+    # Print pairs of Target values
+    print(pairwise_df)
     
-    # print(reconstruct_original_dataset(pairwise_df))
+    print(reconstruct_original_dataset(pairwise_df))
     
-    # pairwise_data = {'ID1': [1, 1, 2],
-    #              'ID2': [2, 3, 3],
-    #              'Comparison': [0.3, 0.8, 0.2]}
-    # pairwise_df = pd.DataFrame(pairwise_data)
+    pairwise_data = {'ID1': [1, 1, 2],
+                 'ID2': [2, 3, 3],
+                 'Comparison': [0.3, 0.8, 0.2]}
+    pairwise_df = pd.DataFrame(pairwise_data)
 
-    # # Reconstruct the original dataset
-    # print(reconstruct_original_dataset(pairwise_df))
+    # Reconstruct the original dataset
+    print(reconstruct_original_dataset(pairwise_df))
     
     
-    num_entries = 100
-    fake_data = {
-        'ID': [i for i in range(1, num_entries + 1)],
-        'Date': pd.date_range(start='2023-01-01', periods=num_entries, freq='D'),
-        'Weather': np.random.choice([0,1,2], size=num_entries),
-        'Temperature': np.random.uniform(10, 30, size=num_entries)  # Random temperature between 10°C and 30°C
-    }
+    # num_entries = 100
+    # fake_data = {
+    #     'ID': [i for i in range(1, num_entries + 1)],
+    #     'Date': pd.date_range(start='2023-01-01', periods=num_entries, freq='D'),
+    #     'Weather': np.random.choice([0,1,2], size=num_entries),
+    #     'Temperature': np.random.uniform(10, 30, size=num_entries)  # Random temperature between 10°C and 30°C
+    # }
 
-    df = pd.DataFrame(fake_data)
-    print(get_training_pairwise(df))
+    # df = pd.DataFrame(fake_data)
+    # print(get_training_pairwise(df))
     
 
     
