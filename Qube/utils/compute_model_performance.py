@@ -221,14 +221,12 @@ class Model:
             else :  
 
                 X_train, X_test, Y_train, Y_test=train_test_split(self.X,self.Y, test_size=0.5)
-                print("X_train and Y_train same ID ?",X_train['ID'].tolist()==Y_train['ID'].tolist())
-                print("X_test and Y_test same ID ?",X_test['ID'].tolist()==Y_test['ID'].tolist())
+                
                 Y_train_pairwise=create_pairwise_dataset(Y_train)
                 X_train_pairwise=get_training_pairwise(X_train)
                 Y_test_pairwise=create_pairwise_dataset(Y_test)
                 X_test_pairwise=get_training_pairwise(X_test)
-                if verbose:
-                    print("pairwise creation done")
+            
                 self.refresh_regressors()
 
                 self.regressor_FR.fit(X_train_pairwise.drop(['ID1','ID2'],axis=1),(Y_train_pairwise['Comparison']))
@@ -250,15 +248,13 @@ class Model:
 
                 Y_pred_train_pairwise= pd.DataFrame({'ID1': X_train_pairwise["ID1"],'ID2': X_train_pairwise["ID2"],'Comparison': Y_train_pred_pairwise_list})
                 print(pd.concat((Y_pred_pairwise.reset_index(drop=True),Y_test_pairwise.reset_index(drop=True)),axis=1).head(1000))
-                if verbose:
-                    print("reconstructing rank ...")
+            
                 Y_pred=reconstruct_original_dataset(Y_pred_pairwise)
                 Y_pred_train=reconstruct_original_dataset(Y_pred_train_pairwise)
                 Y_pred=Y_pred.sort_values(by=['ID'], key=lambda x: x.map({k: i for i, k in enumerate(Y_test['ID'].tolist())}))
                 Y_pred_train=Y_pred_train.sort_values(by=['ID'], key=lambda x: x.map({k: i for i, k in enumerate(Y_train['ID'].tolist())}))
                 print(pd.concat((Y_pred.reset_index(drop=True),Y_test.reset_index(drop=True)),axis=1))
-                print("Y_pred and Y_test same ID ?",Y_pred['ID'].tolist()==Y_test['ID'].tolist())
-                print("Same length ?",len(Y_pred['ID'].tolist())==len(Y_test['ID'].tolist()))
+                
                 # print(pd.concat((Y_pred.reset_index(drop=True),Y_test.reset_index(drop=True)),axis=1))
                 validation=self.evaluate(Y_pred,Y_test,['Rank_recreated'])[0]
                 training=self.evaluate(Y_pred_train,Y_train,['Rank_recreated'])[0]

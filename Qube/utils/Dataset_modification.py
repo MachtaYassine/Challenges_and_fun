@@ -60,7 +60,7 @@ def handle_na(X_train,Y_train,drop_or_fill_na,keep_id):
         Y_modified = Data[['ID','TARGET','Rank','Rank_group']]
     return X_modified,Y_modified
 
-def create_pairwise_dataset(df):
+def create_pairwise_dataset(df,mode=True):
     """
     Create a pairwise dataset for comparing IDs.
 
@@ -80,15 +80,18 @@ def create_pairwise_dataset(df):
 
     # Compare each pair of IDs and add to the list
     for (id1,target1), (id2,target2) in pairs:
-        if not np.isnan(target1) and not np.isnan(target2):
+        if mode:
             comparison = 2 if target1 > target2 else (1 if target1 == target2 else 0.0)
             pairwise_data.append((id1, id2, comparison))
         else:
-            comparison =np.random.choice([0, 1], size=1, p=[.5,.5])[0]
-            pairwise_data.append((id1, id2, comparison))
+            comparison = 2 if target1 > target2 else (1 if target1 == target2 else 0.0)
+            pairwise_data.append((id1, id2, comparison , target1,target2))
 
     # Create a DataFrame from the pairwise data
-    pairwise_df = pd.DataFrame(pairwise_data, columns=['ID1', 'ID2', 'Comparison'])
+    if mode:
+        pairwise_df = pd.DataFrame(pairwise_data, columns=['ID1', 'ID2', 'Comparison'])
+    else:
+        pairwise_df = pd.DataFrame(pairwise_data, columns=['ID1', 'ID2', 'Comparison',"TARGET1","TARGET2"])
 
     return pairwise_df
 
@@ -166,7 +169,7 @@ def get_training_pairwise(df):
     if 'COUNTRY' in columns :
         country_mapping = {'FR': 0, 'DE': 1}
         df['COUNTRY'] = df['COUNTRY'].map(country_mapping)
-        print("Country remapped")
+        
     df.fillna(df.mean(),inplace=True)
     pairs = list(itertools.combinations(df.values, 2))
     # print(len(pairs))
